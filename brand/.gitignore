@@ -1,0 +1,14 @@
+*
+!.gitignore
+
+!png/
+!png/*.png
+
+!svg/
+!svg/*.svg
+
+!pdf/
+!pdf/*.pdf
+
+# DOCS
+!*.md

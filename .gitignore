@@ -1,0 +1,28 @@
+*
+!.jj
+!.gitignore
+!.bazelrc
+!*.toml
+
+# DOCUMENTATION
+!*.md
+
+# NIX
+!nix/
+!*.nix
+!flake.lock
+
+# rust
+!*.rs
+!src/
+
+# BUILD SYSTEMS
+!*.bazel
+
+# PROJECTS
+!test/
+!tools/
+!third_party/
+
+# BRANDING
+!brand/
