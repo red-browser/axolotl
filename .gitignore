@@ -20,7 +20,7 @@
 !*.bazel
 
 # PROJECTS
-!test/
+!tests/
 !tools/
 !third_party/
 
