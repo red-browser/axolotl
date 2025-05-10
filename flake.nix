@@ -18,20 +18,34 @@
         rustToolchain = pkgs.rust-bin.stable."1.70.0".default.override {
           extensions = [ "rust-src" "rustfmt" "clippy" ];
         };
+        basePackages = [
+          rustToolchain
+          pkgs.bazel_6
+          pkgs.bazel-buildtools
+          pkgs.gcc
+          pkgs.glibc
+          pkgs.stdenv.cc.cc.lib
+          pkgs.gnumake
+          pkgs.zlib
+        ];
       in
       {
         devShells.default = pkgs.mkShell {
           name = "axolotl-dev";
-          nativeBuildInputs = [
-            rustToolchain
-            pkgs.bazel
-            pkgs.bazel-buildtools
-            pkgs.gcc
-            pkgs.binutils
-            pkgs.glibc
-            pkgs.stdenv.cc.cc.lib
-            pkgs.jdk
+          nativeBuildInputs = basePackages;
+          
+          buildInputs = with pkgs; [
+            stdenv.cc.cc.lib
+            glibc
+            zlib
           ];
+
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
+            pkgs.glibc
+          ];
+      
           
           shellHook = ''
           export PATH="${rustToolchain}/bin:$PATH"
