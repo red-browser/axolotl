@@ -24,7 +24,7 @@
           name = "axolotl-dev";
           nativeBuildInputs = [
             rustToolchain
-            pkgs.bazel_6
+            pkgs.bazel
             pkgs.bazel-buildtools
             pkgs.gcc
             pkgs.binutils

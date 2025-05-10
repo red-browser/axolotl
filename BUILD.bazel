@@ -2,6 +2,6 @@ load("@rules_rust//rust:defs.bzl", "rust_binary")
 
 rust_binary(
     name = "axolotl",
-    srcs = ["src/main.rs"],
-    edition = "2021",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
 )
