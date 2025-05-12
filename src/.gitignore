@@ -3,3 +3,5 @@
 !*.rs
 !html/
 !html/*.rs
+!css/
+!css/*.rs

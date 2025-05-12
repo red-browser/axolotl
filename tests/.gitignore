@@ -3,3 +3,6 @@
 
 !html/
 !html/*.html
+
+!css/
+!css/*.css
