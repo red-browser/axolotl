@@ -14,7 +14,6 @@ pub struct Node {
 pub struct ElementData {
     pub tag_name: String,
     pub attributes: Vec<(String, String)>,
-    pub self_closing: bool,
 }
 
 impl Node {
@@ -29,19 +28,34 @@ impl Node {
         Node::new(NodeType::Text(data), vec![])
     }
 
-    pub fn elem(
-        name: String,
-        attrs: Vec<(String, String)>,
-        children: Vec<Node>,
-        self_closing: bool,
-    ) -> Self {
+    pub fn elem(name: String, attrs: Vec<(String, String)>, children: Vec<Node>) -> Self {
         Node::new(
             NodeType::Element(ElementData {
                 tag_name: name,
                 attributes: attrs,
-                self_closing,
             }),
             children,
         )
     }
+}
+
+// List of void elements from HTML5 spec
+pub fn is_void_element(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
+    )
 }

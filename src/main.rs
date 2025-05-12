@@ -20,7 +20,7 @@ fn pretty_print(node: &Node, indent: usize) {
                 }
             }
 
-            if elem.self_closing {
+            if html::dom::is_void_element(&elem.tag_name) {
                 println!("/>");
                 return;
             }
@@ -71,6 +71,10 @@ fn main() -> std::io::Result<()> {
 
     let mut parser = Parser::new(html);
     let dom = parser.parse();
-    pretty_print(&dom, 0);
+
+    for child in &dom.children {
+        pretty_print(child, 0);
+    }
+
     Ok(())
 }

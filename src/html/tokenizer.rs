@@ -1,13 +1,14 @@
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Doctype,
-    StartTag(String, Vec<(String, String)>), // Added attributes
+    StartTag(String, Vec<(String, String)>),
     EndTag(String),
     Comment(String),
     Text(String),
     EOF,
     SelfClosingTag(String, Vec<(String, String)>),
 }
+
 pub struct Tokenizer {
     input: String,
     position: usize,
@@ -48,13 +49,14 @@ impl Tokenizer {
     fn parse_start_tag(&mut self) -> Token {
         let tag_name = self.parse_tag_name();
         let attributes = self.parse_attributes();
-        let is_self_closing = self.position < self.input.len()
-            && self.input.chars().nth(self.position).unwrap() == '/';
-        if is_self_closing {
+
+        if self.position < self.input.len() && self.input.chars().nth(self.position).unwrap() == '/'
+        {
             self.position += 1; // Skip '/'
             self.skip_until('>');
             return Token::SelfClosingTag(tag_name, attributes);
         }
+
         self.skip_until('>');
         Token::StartTag(tag_name, attributes)
     }
@@ -66,16 +68,14 @@ impl Tokenizer {
             self.skip_whitespace();
             let c = self.input.chars().nth(self.position).unwrap();
 
-            // Stop if we hit the closing >
-            if c == '>' {
+            if c == '>' || c == '/' {
                 break;
             }
 
-            // Parse attribute name
             let name_start = self.position;
             while self.position < self.input.len() {
                 let c = self.input.chars().nth(self.position).unwrap();
-                if c.is_whitespace() || c == '=' || c == '>' {
+                if c.is_whitespace() || c == '=' || c == '>' || c == '/' {
                     break;
                 }
                 self.position += 1;
@@ -107,14 +107,13 @@ impl Tokenizer {
 
                     let value = self.input[value_start..self.position].to_string();
                     self.position += 1; // Skip closing quote
-
                     attributes.push((name, value));
                 } else {
                     // Unquoted attribute value
                     let value_start = self.position;
                     while self.position < self.input.len() {
                         let c = self.input.chars().nth(self.position).unwrap();
-                        if c.is_whitespace() || c == '>' {
+                        if c.is_whitespace() || c == '>' || c == '/' {
                             break;
                         }
                         self.position += 1;
@@ -123,7 +122,6 @@ impl Tokenizer {
                     attributes.push((name, value));
                 }
             } else {
-                // Boolean attribute (no value)
                 attributes.push((name, "".to_string()));
             }
         }

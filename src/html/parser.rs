@@ -1,6 +1,6 @@
 use super::dom::Node;
 use super::tokenizer::{Token, Tokenizer};
-use crate::html::dom::NodeType;
+use crate::html::dom;
 
 pub struct Parser {
     tokenizer: Tokenizer,
@@ -18,23 +18,22 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Node {
+        let mut root_children = vec![];
+
+        // Skip doctype if present
         if let Token::Doctype = self.current_token {
             self.consume_token();
         }
 
-        let mut root = None;
-
+        // Parse all nodes (HTML may have multiple root nodes in fragments)
         while self.current_token != Token::EOF {
             if let Some(node) = self.parse_node() {
-                if root.is_none() {
-                    root = Some(node);
-                } else {
-                    panic!("Multiple root nodes found");
-                }
+                root_children.push(node);
             }
         }
 
-        root.expect("No root node found")
+        // Create a root node containing all top-level nodes
+        Node::elem("html".to_string(), vec![], root_children)
     }
 
     fn parse_node(&mut self) -> Option<Node> {
@@ -43,13 +42,18 @@ impl Parser {
                 let name = name.clone();
                 let attrs = attrs.clone();
                 self.consume_token();
-                Some(self.parse_element(name, attrs))
+
+                if dom::is_void_element(&name) {
+                    Some(Node::elem(name, attrs, vec![]))
+                } else {
+                    Some(self.parse_element(name, attrs))
+                }
             }
             Token::SelfClosingTag(name, attrs) => {
                 let name = name.clone();
                 let attrs = attrs.clone();
                 self.consume_token();
-                Some(Node::elem(name, attrs, vec![], true)) // true for self_closing
+                Some(Node::elem(name, attrs, vec![]))
             }
             Token::Text(text) => {
                 let text = text.clone();
@@ -65,6 +69,7 @@ impl Parser {
                 None
             }
             Token::EndTag(_) => {
+                // Handle mismatched end tags more gracefully
                 self.consume_token();
                 None
             }
@@ -87,7 +92,7 @@ impl Parser {
             self.consume_token();
         }
 
-        Node::elem(tag_name, attributes, children, false)
+        Node::elem(tag_name, attributes, children)
     }
 
     fn consume_token(&mut self) {
