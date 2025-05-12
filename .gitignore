@@ -5,6 +5,7 @@
 !*.toml
 
 # DOCUMENTATION
+!docs/
 !*.md
 
 # NIX
