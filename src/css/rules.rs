@@ -8,6 +8,14 @@ pub struct Stylesheet {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Rule {
     Style(StyleRule),
+    Media { query: String, rules: Vec<Rule> },
+    Keyframes { name: String, frames: Vec<Keyframe> },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Keyframe {
+    pub selectors: Vec<String>,
+    pub declarations: Vec<Declaration>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

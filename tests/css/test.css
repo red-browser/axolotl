@@ -1,27 +1,12 @@
-body {
-    font-size: 16px;
-    line-height: 1.5;
-    color: #333;
-    margin: 0;
+@media (min-width: 600px) {
+    body { font-size: 18px; } 
 }
 
-.container {
-    width: 80%;
-    margin: 0 auto !important;
-    padding: 20px;
-    background-color: #ffffff;
+@keyframes fade {
+    from { opacity: 0; }      
+    to { opacity: 1; }        
 }
 
-#header .title {
-    font-weight: bold;
-    color: red;
-}
-
-a:hover, a:focus {
-    text-decoration: none;
-    color: #0066cc;
-}
-
-[data-attr="value"] {
-    border: 1px solid #ccc;
-}
+body { 
+    color: black;
+ }
