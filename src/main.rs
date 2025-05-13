@@ -108,17 +108,33 @@ fn main() -> std::io::Result<()> {
                     for rule in stylesheet.rules {
                         match rule {
                             css::rules::Rule::Style(style_rule) => {
-                                println!("Selectors: {:?}", style_rule.selectors);
+                                println!("Style Rule:");
+                                println!("  Selectors: {:?}", style_rule.selectors);
                                 for decl in style_rule.declarations {
-                                    println!("  {}: {:?}", decl.name, decl.value);
+                                    println!("    {}: {:?}", decl.name, decl.value);
                                 }
                             }
                             css::rules::Rule::Media { query, rules } => {
                                 println!("@media {} {{", query);
+                                for nested_rule in rules {
+                                    if let css::rules::Rule::Style(sr) = nested_rule {
+                                        println!("  Nested Rule:");
+                                        println!("    Selectors: {:?}", sr.selectors);
+                                        for decl in sr.declarations {
+                                            println!("      {}: {:?}", decl.name, decl.value);
+                                        }
+                                    }
+                                }
                                 println!("}}");
                             }
                             css::rules::Rule::Keyframes { name, frames } => {
                                 println!("@keyframes {} {{", name);
+                                for frame in frames {
+                                    println!("  Keyframe Selectors: {:?}", frame.selectors);
+                                    for decl in frame.declarations {
+                                        println!("    {}: {:?}", decl.name, decl.value);
+                                    }
+                                }
                                 println!("}}");
                             }
                         }

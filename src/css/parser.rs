@@ -20,26 +20,53 @@ impl<'a> CssParser<'a> {
 
     pub fn parse_stylesheet(&mut self) -> Result<Stylesheet, &'static str> {
         let mut stylesheet = Stylesheet { rules: Vec::new() };
+        let mut consecutive_errors = 0;
+        const MAX_CONSECUTIVE_ERRORS: usize = 10;
 
-        while !self.eof() {
+        while !self.eof() && consecutive_errors < MAX_CONSECUTIVE_ERRORS {
+            let start_pos = self.position;
             self.consume_whitespace_and_comments();
 
             if self.eof() {
                 break;
             }
 
-            if self.next_char() == '@' {
-                self.skip_at_rule()?;
-                continue;
+            match self.next_char() {
+                '@' => match self.parse_at_rule() {
+                    Ok(rule) => {
+                        stylesheet.rules.push(rule);
+                        consecutive_errors = 0;
+                    }
+                    Err(e) => {
+                        eprintln!("{} at position {}", e, self.position);
+                        consecutive_errors += 1;
+                    }
+                },
+                _ => match self.parse_rule() {
+                    Ok(rule) => {
+                        stylesheet.rules.push(rule);
+                        consecutive_errors = 0;
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Skipping malformed rule: {} at position {}",
+                            e, self.position
+                        );
+                        self.skip_to_next_rule();
+                        consecutive_errors += 1;
+                    }
+                },
             }
 
-            match self.parse_rule() {
-                Ok(rule) => stylesheet.rules.push(rule),
-                Err(e) => {
-                    eprintln!("Skipping rule: {}", e);
-                    self.skip_to_next_rule();
-                }
+            if self.position == start_pos {
+                eprintln!("Forcing progress at position {}", self.position);
+                self.consume_char();
+                consecutive_errors += 1;
             }
+        }
+
+        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+            eprintln!("Too many errors, aborting parsing");
         }
 
         Ok(stylesheet)
@@ -114,17 +141,48 @@ impl<'a> CssParser<'a> {
         Ok(())
     }
 
-    fn skip_to_next_rule(&mut self) {
-        self.consume_while(|c| c != '}' && c != '{');
-        if self.next_char() == '{' {
-            self.skip_block();
+    fn skip_to_next_rule(&mut self) -> usize {
+        let start = self.position;
+        let mut depth = 0;
+
+        while !self.eof() {
+            match self.next_char() {
+                '@' if depth == 0 => {
+                    break;
+                }
+                '{' => {
+                    depth += 1;
+                    self.consume_char();
+                }
+                '}' => {
+                    if depth > 0 {
+                        depth -= 1;
+                    }
+                    self.consume_char();
+                    if depth == 0 {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                _ => {
+                    self.consume_char();
+                }
+            }
         }
+
+        self.position - start
     }
 
     fn parse_rule(&mut self) -> Result<Rule, &'static str> {
+        let start_pos = self.position;
         let selectors = self.parse_selectors()?;
-        let declarations = self.parse_declarations()?;
 
+        if self.position == start_pos {
+            return Err("No progress made while parsing selectors");
+        }
+
+        let declarations = self.parse_declarations()?;
         Ok(Rule::Style(StyleRule {
             selectors,
             declarations,
@@ -416,41 +474,65 @@ impl<'a> CssParser<'a> {
     }
 
     fn parse_at_rule(&mut self) -> Result<Rule, &'static str> {
-        self.consume_char();
+        let start_pos = self.position;
+        self.consume_char(); // Skip @
         let name = self.parse_identifier();
+        self.consume_whitespace();
 
         match name.as_str() {
             "media" => {
                 let query = self.consume_while(|c| c != '{').trim().to_string();
-                self.consume_char();
-                let mut rules = Vec::new();
-                while self.next_char() != '}' {
-                    rules.push(self.parse_rule()?);
+                if query.is_empty() {
+                    return Err("Empty media query");
                 }
-                self.consume_char();
+                self.expect_char('{')?;
+                let rules = self.parse_rules_block()?;
                 Ok(Rule::Media { query, rules })
             }
             "keyframes" => {
                 let name = self.parse_identifier();
-                self.consume_while(|c| c != '{');
-                self.consume_char();
-                let mut frames = Vec::new();
-                while self.next_char() != '}' {
-                    let selectors = self.parse_keyframe_selectors()?;
-                    let declarations = self.parse_declarations()?;
-                    frames.push(Keyframe {
-                        selectors,
-                        declarations,
-                    });
-                }
-                self.consume_char();
+                self.expect_char('{')?;
+                let frames = self.parse_keyframe_rules()?;
                 Ok(Rule::Keyframes { name, frames })
             }
             _ => {
-                self.skip_at_rule()?;
-                Err("Unsupported at-rule")
+                self.consume_while(|c| c != ';' && c != '{');
+                if self.next_char() == '{' {
+                    self.skip_block()?;
+                } else if self.next_char() == ';' {
+                    self.consume_char();
+                }
+                Err("Skipped unsupported at-rule")
             }
         }
+    }
+
+    fn expect_char(&mut self, expected: char) -> Result<(), &'static str> {
+        if self.next_char() == expected {
+            self.consume_char();
+            Ok(())
+        } else {
+            Err("Expected character not found")
+        }
+    }
+
+    fn parse_rules_block(&mut self) -> Result<Vec<Rule>, &'static str> {
+        let mut rules = Vec::new();
+        self.consume_whitespace_and_comments();
+
+        while !self.eof() && self.next_char() != '}' {
+            match self.parse_rule() {
+                Ok(rule) => rules.push(rule),
+                Err(e) => {
+                    eprintln!("Skipping malformed rule in block: {}", e);
+                    self.skip_to_next_rule();
+                }
+            }
+            self.consume_whitespace_and_comments();
+        }
+
+        self.expect_char('}')?;
+        Ok(rules)
     }
 
     fn parse_color(&mut self) -> Value {
@@ -489,6 +571,21 @@ impl<'a> CssParser<'a> {
     fn parse_float(&mut self) -> f32 {
         let s = self.consume_while(|c| matches!(c, '0'..='9' | '.' | '+' | '-'));
         s.parse().unwrap_or(0.0)
+    }
+
+    fn parse_keyframe_rules(&mut self) -> Result<Vec<Keyframe>, &'static str> {
+        let mut frames = Vec::new();
+        while !self.eof() && self.next_char() != '}' {
+            let selectors = self.parse_keyframe_selectors()?;
+            let declarations = self.parse_declarations()?;
+            frames.push(Keyframe {
+                selectors,
+                declarations,
+            });
+            self.consume_whitespace_and_comments();
+        }
+        self.expect_char('}')?;
+        Ok(frames)
     }
 
     fn parse_keyframe_selectors(&mut self) -> Result<Vec<String>, &'static str> {

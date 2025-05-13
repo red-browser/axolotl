@@ -1,12 +1,13 @@
-@media (min-width: 600px) {
-    body { font-size: 18px; } 
+.invalid { 
+    color: 
 }
 
-@keyframes fade {
-    from { opacity: 0; }      
-    to { opacity: 1; }        
+@foo bar; 
+
+.valid {
+    color: green;
 }
 
-body { 
-    color: black;
- }
+@media (min-width: 300px) {
+    .nested { padding: 10px; }
+}
