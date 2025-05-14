@@ -1,6 +1,5 @@
-use super::dom::Node;
+use super::dom::{self, Node, NodeType};
 use super::tokenizer::{Token, Tokenizer};
-use crate::html::dom;
 
 pub struct Parser {
     tokenizer: Tokenizer,
@@ -18,22 +17,55 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Node {
-        let mut root_children = vec![];
+        let mut children = vec![];
+        let mut has_doctype = false;
+        let mut has_html = false;
 
-        // Skip doctype if present
+        // Parse doctype if present
         if let Token::Doctype = self.current_token {
+            children.push(Node::doctype());
+            has_doctype = true;
             self.consume_token();
         }
 
-        // Parse all nodes (HTML may have multiple root nodes in fragments)
         while self.current_token != Token::EOF {
             if let Some(node) = self.parse_node() {
-                root_children.push(node);
+                if let NodeType::Element(ref elem) = node.node_type {
+                    if elem.tag_name == "html" {
+                        has_html = true;
+                    }
+                }
+                children.push(node);
             }
         }
 
-        // Create a root node containing all top-level nodes
-        Node::elem("html".to_string(), vec![], root_children)
+        if !has_html {
+            let mut html_children = vec![];
+            let mut head = None;
+            let mut body_children = vec![];
+
+            for child in children {
+                if let NodeType::Element(ref elem) = child.node_type {
+                    if elem.tag_name == "head" {
+                        head = Some(child);
+                        continue;
+                    }
+                }
+                body_children.push(child);
+            }
+
+            let head =
+                head.unwrap_or_else(|| Node::elem("head".to_string(), vec![], vec![], false));
+
+            let body = Node::elem("body".to_string(), vec![], body_children, false);
+
+            html_children.push(head);
+            html_children.push(body);
+
+            children = vec![Node::elem("html".to_string(), vec![], html_children, false)];
+        }
+
+        Node::new(NodeType::Document, children)
     }
 
     fn parse_node(&mut self) -> Option<Node> {
@@ -44,7 +76,7 @@ impl Parser {
                 self.consume_token();
 
                 if dom::is_void_element(&name) {
-                    Some(Node::elem(name, attrs, vec![]))
+                    Some(Node::elem(name, attrs, vec![], true))
                 } else {
                     Some(self.parse_element(name, attrs))
                 }
@@ -53,23 +85,23 @@ impl Parser {
                 let name = name.clone();
                 let attrs = attrs.clone();
                 self.consume_token();
-                Some(Node::elem(name, attrs, vec![]))
+                Some(Node::elem(name, attrs, vec![], true))
             }
             Token::Text(text) => {
                 let text = text.clone();
                 self.consume_token();
-                if text.trim().is_empty() {
-                    None
-                } else {
-                    Some(Node::text(text))
-                }
+                Some(Node::text(text))
             }
-            Token::Comment(_) | Token::Doctype => {
+            Token::Comment(text) => {
+                let text = text.clone();
                 self.consume_token();
-                None
+                Some(Node::comment(text))
+            }
+            Token::Doctype => {
+                self.consume_token();
+                Some(Node::doctype())
             }
             Token::EndTag(_) => {
-                // Handle mismatched end tags more gracefully
                 self.consume_token();
                 None
             }
@@ -79,20 +111,36 @@ impl Parser {
 
     fn parse_element(&mut self, tag_name: String, attributes: Vec<(String, String)>) -> Node {
         let mut children = vec![];
+        let mut stack = vec![tag_name.clone()];
 
-        while self.current_token != Token::EndTag(tag_name.clone())
-            && self.current_token != Token::EOF
-        {
-            if let Some(child) = self.parse_node() {
-                children.push(child);
+        while self.current_token != Token::EOF {
+            match &self.current_token {
+                Token::EndTag(end_tag) if end_tag == &tag_name => {
+                    self.consume_token();
+                    break;
+                }
+                Token::EndTag(unexpected_end) => {
+                    if stack.last() == Some(unexpected_end) {
+                        stack.pop();
+                        self.consume_token();
+                    } else {
+                        self.consume_token();
+                    }
+                }
+                _ => {
+                    if let Some(child) = self.parse_node() {
+                        if let NodeType::Element(ref elem) = child.node_type {
+                            if !dom::is_void_element(&elem.tag_name) {
+                                stack.push(elem.tag_name.clone());
+                            }
+                        }
+                        children.push(child);
+                    }
+                }
             }
         }
 
-        if let Token::EndTag(_) = self.current_token {
-            self.consume_token();
-        }
-
-        Node::elem(tag_name, attributes, children)
+        Node::elem(tag_name, attributes, children, false)
     }
 
     fn consume_token(&mut self) {

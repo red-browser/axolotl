@@ -1,7 +1,10 @@
 #[derive(Debug, PartialEq)]
 pub enum NodeType {
+    Document,
+    Doctype,
     Element(ElementData),
     Text(String),
+    Comment(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -14,6 +17,7 @@ pub struct Node {
 pub struct ElementData {
     pub tag_name: String,
     pub attributes: Vec<(String, String)>,
+    pub is_self_closing: bool,
 }
 
 impl Node {
@@ -28,14 +32,28 @@ impl Node {
         Node::new(NodeType::Text(data), vec![])
     }
 
-    pub fn elem(name: String, attrs: Vec<(String, String)>, children: Vec<Node>) -> Self {
+    pub fn elem(
+        name: String,
+        attrs: Vec<(String, String)>,
+        children: Vec<Node>,
+        is_self_closing: bool,
+    ) -> Self {
         Node::new(
             NodeType::Element(ElementData {
                 tag_name: name,
                 attributes: attrs,
+                is_self_closing,
             }),
             children,
         )
+    }
+
+    pub fn doctype() -> Self {
+        Node::new(NodeType::Doctype, vec![])
+    }
+
+    pub fn comment(data: String) -> Self {
+        Node::new(NodeType::Comment(data), vec![])
     }
 }
 

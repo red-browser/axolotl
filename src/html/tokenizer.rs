@@ -1,3 +1,5 @@
+use crate::html::dom;
+
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Doctype,
@@ -50,15 +52,26 @@ impl Tokenizer {
         let tag_name = self.parse_tag_name();
         let attributes = self.parse_attributes();
 
-        if self.position < self.input.len() && self.input.chars().nth(self.position).unwrap() == '/'
-        {
-            self.position += 1; // Skip '/'
-            self.skip_until('>');
-            return Token::SelfClosingTag(tag_name, attributes);
-        }
+        // Check for self-closing
+        let is_self_closing = if self.position < self.input.len() {
+            let c = self.input.chars().nth(self.position).unwrap();
+            if c == '/' {
+                self.position += 1;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         self.skip_until('>');
-        Token::StartTag(tag_name, attributes)
+
+        if is_self_closing || dom::is_void_element(&tag_name) {
+            Token::SelfClosingTag(tag_name, attributes)
+        } else {
+            Token::StartTag(tag_name, attributes)
+        }
     }
 
     fn parse_attributes(&mut self) -> Vec<(String, String)> {
@@ -72,6 +85,7 @@ impl Tokenizer {
                 break;
             }
 
+            // Parse attribute name
             let name_start = self.position;
             while self.position < self.input.len() {
                 let c = self.input.chars().nth(self.position).unwrap();
@@ -80,7 +94,7 @@ impl Tokenizer {
                 }
                 self.position += 1;
             }
-            let name = self.input[name_start..self.position].to_ascii_lowercase();
+            let name = self.input[name_start..self.position].to_string();
 
             // Skip whitespace after name
             self.skip_whitespace();
@@ -122,6 +136,7 @@ impl Tokenizer {
                     attributes.push((name, value));
                 }
             } else {
+                // Boolean attribute (no value)
                 attributes.push((name, "".to_string()));
             }
         }
@@ -196,7 +211,7 @@ impl Tokenizer {
         let start = self.position;
         while self.position < self.input.len() {
             let c = self.input.chars().nth(self.position).unwrap();
-            if !c.is_alphanumeric() {
+            if !c.is_alphanumeric() && c != '-' && c != ':' {
                 break;
             }
             self.position += 1;

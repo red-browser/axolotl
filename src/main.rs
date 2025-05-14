@@ -8,38 +8,120 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-fn pretty_print(node: &Node, indent: usize) {
-    let spaces = " ".repeat(indent);
+/* defining two printmodes */
+#[derive(Clone, Copy, PartialEq)]
+pub enum PrintMode {
+    Pretty,
+    Compact,
+}
+
+fn escape_html_text(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn escape_html_attribute(value: &str) -> String {
+    escape_html_text(value)
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn collapse_whitespace(text: String) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut in_whitespace = false;
+
+    for c in text.chars() {
+        if c.is_whitespace() {
+            if !in_whitespace {
+                result.push(' ');
+                in_whitespace = true;
+            }
+        } else {
+            result.push(c);
+            in_whitespace = false;
+        }
+    }
+
+    result
+}
+
+fn pretty_print(node: &Node, indent: usize, mode: PrintMode) {
+    let spaces = match mode {
+        PrintMode::Pretty => " ".repeat(indent),
+        PrintMode::Compact => "".to_string(),
+    };
 
     match &node.node_type {
+        NodeType::Document => {
+            for child in &node.children {
+                pretty_print(child, indent, mode);
+            }
+        }
+        NodeType::Doctype => {
+            println!("<!DOCTYPE html>");
+        }
         NodeType::Element(elem) => {
-            print!("{}<{}", spaces, elem.tag_name);
+            // Opening tag
+            match mode {
+                PrintMode::Pretty => print!("{}<{}", spaces, elem.tag_name),
+                PrintMode::Compact => print!("<{}", elem.tag_name),
+            }
+
+            // Attributes
             for (name, value) in &elem.attributes {
                 if value.is_empty() {
                     print!(" {}", name);
                 } else {
-                    print!(" {}=\"{}\"", name, value);
+                    print!(" {}=\"{}\"", name, escape_html_attribute(value));
                 }
             }
 
-            if html::dom::is_void_element(&elem.tag_name) {
+            // Self-closing or children
+            if elem.is_self_closing || html::dom::is_void_element(&elem.tag_name) {
                 println!("/>");
                 return;
+            } else {
+                print!(">");
+                if mode == PrintMode::Pretty && !node.children.is_empty() {
+                    println!();
+                }
             }
 
-            println!(">");
-
+            // Children
             for child in &node.children {
-                pretty_print(child, indent + 2);
+                pretty_print(child, indent + 2, mode);
             }
 
-            println!("{}</{}>", spaces, elem.tag_name);
+            // Closing tag
+            match mode {
+                PrintMode::Pretty if !node.children.is_empty() => {
+                    println!("{}</{}>", spaces, elem.tag_name);
+                }
+                _ => print!("</{}>", elem.tag_name),
+            }
+
+            if mode == PrintMode::Pretty {
+                println!();
+            }
         }
         NodeType::Text(text) => {
-            if !text.trim().is_empty() {
-                println!("{}{}", spaces, text.trim());
+            let text = escape_html_text(text);
+            let text = match mode {
+                PrintMode::Pretty => collapse_whitespace(text.trim().to_string()),
+                PrintMode::Compact => collapse_whitespace(text),
+            };
+            if !text.is_empty() {
+                match mode {
+                    PrintMode::Pretty => println!("{}{}", spaces, text),
+                    PrintMode::Compact => print!("{}", text),
+                }
             }
         }
+        NodeType::Comment(text) => match mode {
+            PrintMode::Pretty => println!("{}<!--{}-->", spaces, text),
+            PrintMode::Compact => print!("<!--{}-->", text),
+        },
     }
 }
 
@@ -86,11 +168,31 @@ fn parse_inline_styles(node: &Node, stylesheet: &mut css::rules::Stylesheet) {
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <file>", args[0]);
+        eprintln!("Usage: {} [--format=pretty|compact] <file>", args[0]);
         std::process::exit(1);
     }
 
-    let file_path = &args[1];
+    let mut format = PrintMode::Compact;
+    let mut file_index = 1;
+
+    if args[1].starts_with("--format=") {
+        match args[1].split('=').nth(1) {
+            Some("pretty") => format = PrintMode::Pretty,
+            Some("compact") => format = PrintMode::Compact,
+            _ => {
+                eprintln!("Invalid format. Use 'pretty' or 'compact'");
+                std::process::exit(1);
+            }
+        }
+        file_index = 2;
+    }
+
+    if args.len() <= file_index {
+        eprintln!("Missing file argument");
+        std::process::exit(1);
+    }
+
+    let file_path = &args[file_index];
     let content = fs::read_to_string(file_path)?;
 
     let path = Path::new(file_path);
@@ -98,7 +200,7 @@ fn main() -> std::io::Result<()> {
         Some("html") => {
             let mut html_parser = Parser::new(content);
             let dom = html_parser.parse();
-            pretty_print(&dom, 0);
+            pretty_print(&dom, 0, format);
         }
         Some("css") => {
             let mut css_parser = css::parser::CssParser::new(&content);

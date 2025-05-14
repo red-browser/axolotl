@@ -1,0 +1,5 @@
+div > p:first-child { color: red; }
+[data-value^="important"] { font-weight: bold; }
+
+:root { --color: #fff; }             
+div { margin: 0; !important }        
