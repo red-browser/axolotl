@@ -20,7 +20,7 @@
         };
         basePackages = [
           rustToolchain
-          pkgs.bazel_6
+          pkgs.bazel_7
           pkgs.bazel-buildtools
           pkgs.gcc
           pkgs.glibc
