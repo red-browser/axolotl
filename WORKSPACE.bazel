@@ -59,3 +59,24 @@ rules_proto_dependencies()
 
 load("@rules_proto//proto:toolchains.bzl", "rules_proto_toolchains")
 rules_proto_toolchains()
+
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository", "crate")
+
+crates_repository(
+    name = "crates_index",
+    annotations = {
+        "serde": [crate.annotation(
+            gen_binaries = False,
+        )],
+        "serde_json": [crate.annotation(
+            gen_binaries = False,
+        )],
+    },
+    cargo_lockfile = "//:Cargo.lock",
+    lockfile = "//:cargo-bazel-lock.json",
+    manifests = ["//:Cargo.toml"],
+    packages = {
+        "serde": "1.0.193",
+        "serde_json": "1.0.108",
+    },
+)

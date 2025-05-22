@@ -2,8 +2,8 @@ mod css;
 mod html;
 
 use crate::html::dom::NodeType;
-use html::dom::Node;
 use html::Parser;
+use html::dom::Node;
 use std::env;
 use std::fs;
 use std::path::Path;
