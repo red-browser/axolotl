@@ -1,8 +1,0 @@
-load("@rules_rust//rust:defs.bzl", "rust_binary")
-
-rust_binary(
-    name = "axolotl",
-    srcs = glob(["src/**/*.rs"]),
-    data = ["tests/html/test.html"],
-    edition = "2024",
-)

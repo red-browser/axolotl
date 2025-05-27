@@ -16,6 +16,8 @@
 # rust
 !*.rs
 !src/
+!*.toml
+!Cargo.lock
 
 # BUILD SYSTEMS
 !*.bazel

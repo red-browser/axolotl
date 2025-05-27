@@ -1,0 +1,23 @@
+[package]
+name = "axolotl"
+version = "0.0.1"
+edition = "2021"
+authors = ["qxrein"]
+description = "A browser project"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.38", features = ["macros", "net", "rt-multi-thread"], default_features = false }
+tonic = "0.11"
+prost = "0.12"
+
+[toolchain]
+channel = "1.80.1"
+components = ["rustc", "rustfmt", "clippy"]
+
+[build-dependencies]
+tonic-build = "0.11"
+prost = "0.12"

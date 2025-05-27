@@ -15,17 +15,19 @@
           inherit system overlays;
           config.allowUnfree = true;
         };
-        rustToolchain = pkgs.rust-bin.stable."1.70.0".default.override {
+        rustToolchain = pkgs.rust-bin.stable."1.80.1".default.override {
           extensions = [ "rust-src" "rustfmt" "clippy" ];
         };
         basePackages = [
           rustToolchain
           pkgs.bazel_7
+          pkgs.cargo-bazel
           pkgs.bazel-buildtools
           pkgs.gcc
           pkgs.glibc
           pkgs.stdenv.cc.cc.lib
           pkgs.gnumake
+          pkgs.cargo-raze
           pkgs.zlib
         ];
       in

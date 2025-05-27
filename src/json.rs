@@ -1,6 +1,9 @@
-use crate::css::rules::{Declaration, Rule, Selector, SimpleSelector, StyleRule, Stylesheet};
+use crate::css::rules::{
+    AttributeOperator, AttributeSelector, Declaration, Keyframe, Rule, Selector, SimpleSelector,
+    StyleRule, Stylesheet,
+};
+use crate::css::values::Value as CssValue;
 use crate::html::dom::{ElementData, Node, NodeType};
-use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
 pub fn node_to_json(node: &Node) -> Value {
@@ -16,7 +19,7 @@ pub fn node_to_json(node: &Node) -> Value {
             let mut json_elem = json!({
                 "type": "element",
                 "tag": elem.tag_name,
-                "attributes": elem.attributes,
+                "attributes": elem.attributes.iter().map(|(k, v)| json!({k: v})).collect::<Vec<_>>(),
                 "children": node.children.iter().map(node_to_json).collect::<Vec<_>>()
             });
 
@@ -66,22 +69,91 @@ fn rule_to_json(rule: &Rule) -> Value {
 
 fn selector_to_json(selector: &Selector) -> Value {
     match selector {
-        Selector::Simple(simple) => json!({
-            "type": "simple_selector",
-            "tag_name": simple.tag_name,
-            "id": simple.id,
-            "classes": simple.classes,
-            "universal": simple.universal
-        }),
+        Selector::Simple(simple) => {
+            json!({
+                "type": "simple_selector",
+                "tag_name": simple.tag_name,
+                "id": simple.id,
+                "classes": simple.classes,
+                "universal": simple.universal,
+                "attributes": simple.attributes.iter().map(attribute_selector_to_json).collect::<Vec<_>>()
+            })
+        }
     }
+}
+
+fn attribute_selector_to_json(attr: &AttributeSelector) -> Value {
+    json!({
+        "name": attr.name,
+        "operator": match attr.op {
+            Some(AttributeOperator::Equal) => "=",
+            Some(AttributeOperator::Includes) => "~=",
+            Some(AttributeOperator::DashMatch) => "|=",
+            Some(AttributeOperator::Prefix) => "^=",
+            Some(AttributeOperator::Suffix) => "$=",
+            Some(AttributeOperator::Substring) => "*=",
+            None => "",
+        },
+        "value": attr.value
+    })
 }
 
 fn declaration_to_json(declaration: &Declaration) -> Value {
     json!({
         "property": declaration.name,
-        "value": format!("{:?}", declaration.value),
+        "value": css_value_to_json(&declaration.value),
         "important": declaration.important
     })
+}
+
+fn css_value_to_json(value: &CssValue) -> Value {
+    match value {
+        CssValue::Keyword(s) => json!(s),
+        CssValue::Length(n, unit) => json!({
+            "value": n,
+            "unit": format!("{:?}", unit).to_lowercase()
+        }),
+        CssValue::Percentage(p) => json!({
+            "value": p,
+            "unit": "%"
+        }),
+        CssValue::Color(color) => json!({
+            "type": "color",
+            "r": color.r,
+            "g": color.g,
+            "b": color.b,
+            "a": color.a
+        }),
+        CssValue::Url(url) => json!(url),
+        CssValue::String(s) => json!(s),
+        CssValue::Function(name, args) => json!({
+            "type": "function",
+            "name": name,
+            "args": args.iter().map(css_value_to_json).collect::<Vec<_>>()
+        }),
+        CssValue::Rect(rect) => json!({
+            "type": "rect",
+            "top": css_value_to_json(&rect.top),
+            "right": css_value_to_json(&rect.right),
+            "bottom": css_value_to_json(&rect.bottom),
+            "left": css_value_to_json(&rect.left)
+        }),
+        CssValue::Initial => json!("initial"),
+        CssValue::Inherit => json!("inherit"),
+        CssValue::Unset => json!("unset"),
+        CssValue::CurrentColor => json!("currentColor"),
+        CssValue::Auto => json!("auto"),
+        CssValue::None => json!("none"),
+        CssValue::LinearGradient(gradient) => json!({
+            "type": "linear-gradient",
+            "direction": css_value_to_json(&gradient.direction),
+            "stops": gradient.stops.iter().map(|stop| json!({
+                "color": css_value_to_json(&CssValue::Color(stop.color.clone())),
+                "position": stop.position.as_ref().map(css_value_to_json)
+            })).collect::<Vec<_>>()
+        }),
+        CssValue::List(values) => json!(values.iter().map(css_value_to_json).collect::<Vec<_>>()),
+    }
 }
 
 fn keyframe_to_json(keyframe: &Keyframe) -> Value {
