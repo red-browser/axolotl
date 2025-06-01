@@ -1,7 +1,6 @@
 *
 !.jj
 !.gitignore
-!.bazelrc
 !*.toml
 
 # DOCUMENTATION
@@ -18,9 +17,6 @@
 !src/
 !*.toml
 !Cargo.lock
-
-# BUILD SYSTEMS
-!*.bazel
 
 # PROJECTS
 !tests/
